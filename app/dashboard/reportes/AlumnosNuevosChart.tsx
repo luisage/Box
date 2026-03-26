@@ -101,7 +101,7 @@ export default function AlumnosNuevosChart() {
                 color: '#f9fafb',
                 fontSize: 13,
               }}
-              formatter={(value: number) => [value, 'Alumnos nuevos']}
+              formatter={(value) => [value, 'Alumnos nuevos']}
             />
             <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={48}>
               {datos.map((entry, i) => (
