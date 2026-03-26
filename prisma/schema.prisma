@@ -276,9 +276,10 @@ model categoriaProducto {
 
 model productos {
   id          Int      @id @default(autoincrement())
-  nombre      String    
-  descripcion  String   
+  nombre      String
+  descripcion  String
   imagen     String?
+  publicId   String?
   costo Int
   categoria  String
   estatus        Boolean  @default(true)
@@ -286,8 +287,9 @@ model productos {
 
 model imagenCarrusel {
   id          Int      @id @default(autoincrement())
-  nombre      String?    
+  nombre      String?
   url     String
+  publicId   String?
   estatus        Boolean  @default(true)
 }
 

@@ -8,7 +8,7 @@ import {
   actualizarImagenCarrusel,
 } from '@/app/actions'
 
-type ImagenRow = { id: number; nombre: string | null; url: string; estatus: boolean }
+type ImagenRow = { id: number; nombre: string | null; url: string; publicId: string | null; estatus: boolean }
 
 // ── Dropzone ──────────────────────────────────────────────────────────────────
 
@@ -112,8 +112,9 @@ function CarruselModal({ imagen, onClose, onSuccess }: ModalProps) {
 
     const fd = new FormData()
     if (esEdicion) {
-      fd.set('id',        String(imagen!.id))
-      fd.set('urlActual', imagen!.url)
+      fd.set('id',             String(imagen!.id))
+      fd.set('urlActual',      imagen!.url)
+      fd.set('publicIdActual', imagen!.publicId ?? '')
     }
     fd.set('nombre',  nombre)
     fd.set('estatus', String(estatus))

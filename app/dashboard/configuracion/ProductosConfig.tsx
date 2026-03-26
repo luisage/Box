@@ -9,6 +9,7 @@ type Producto = {
   nombre:      string
   descripcion: string
   imagen:      string | null
+  publicId:    string | null
   costo:       number
   categoria:   string
   estatus:     boolean
@@ -131,8 +132,9 @@ function ProductoModal({ producto, categorias, onClose, onSuccess }: ModalProps)
 
     const fd = new FormData()
     if (esEdicion) {
-      fd.set('id', String(producto!.id))
-      fd.set('imagenActual', producto!.imagen ?? '')
+      fd.set('id',             String(producto!.id))
+      fd.set('imagenActual',   producto!.imagen   ?? '')
+      fd.set('publicIdActual', producto!.publicId ?? '')
     }
     fd.set('nombre',      fields.nombre)
     fd.set('descripcion', fields.descripcion)

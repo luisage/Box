@@ -5,8 +5,6 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { ahoraEnCDMX } from '@/app/lib/timezone'
-import { writeFile } from 'fs/promises'
-import { join } from 'path'
 import { cloudinary } from '@/app/lib/cloudinary'
 
 // ── Videos ────────────────────────────────────────────────────────────────────
@@ -144,14 +142,6 @@ export async function getProductosActivos() {
   })
 }
 
-async function guardarImagenProducto(file: File): Promise<string> {
-  const ext      = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const filename = `${Date.now()}.${ext}`
-  const buffer   = Buffer.from(await file.arrayBuffer())
-  await writeFile(join(process.cwd(), 'public', 'ImagenProducto', filename), buffer)
-  return `/ImagenProducto/${filename}`
-}
-
 export async function crearProducto(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
@@ -169,14 +159,22 @@ export async function crearProducto(
   const costo = parseInt(costoRaw)
   if (isNaN(costo) || costo <= 0) return { error: 'El costo debe ser un número mayor a 0.' }
 
-  let imagen: string | null = null
+  let imagen:   string | null = null
+  let publicId: string | null = null
   if (imagenFile && imagenFile.size > 0) {
-    try { imagen = await guardarImagenProducto(imagenFile) }
-    catch { return { error: 'Error al guardar la imagen.' } }
+    try {
+      const buffer  = Buffer.from(await imagenFile.arrayBuffer())
+      const dataUri = `data:${imagenFile.type};base64,${buffer.toString('base64')}`
+      const result  = await cloudinary.uploader.upload(dataUri, { folder: 'box_gym/productos' })
+      imagen   = result.secure_url
+      publicId = result.public_id
+    } catch {
+      return { error: 'Error al subir la imagen.' }
+    }
   }
 
   try {
-    await prisma.productos.create({ data: { nombre, descripcion, imagen, costo, categoria, estatus } })
+    await prisma.productos.create({ data: { nombre, descripcion, imagen, publicId, costo, categoria, estatus } })
     return { success: true }
   } catch {
     return { error: 'Error al guardar el producto. Intenta de nuevo.' }
@@ -186,14 +184,15 @@ export async function crearProducto(
 export async function actualizarProducto(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  const id          = parseInt(formData.get('id')          as string)
-  const nombre      = (formData.get('nombre')              as string)?.trim()
-  const descripcion = (formData.get('descripcion')         as string)?.trim()
-  const costoRaw    = (formData.get('costo')               as string)?.trim()
-  const categoria   = (formData.get('categoria')           as string)?.trim()
-  const estatus     = formData.get('estatus') === 'true'
-  const imagenFile  = formData.get('imagen') as File | null
-  const imagenActual = (formData.get('imagenActual')       as string)?.trim() || null
+  const id              = parseInt(formData.get('id')              as string)
+  const nombre          = (formData.get('nombre')                  as string)?.trim()
+  const descripcion     = (formData.get('descripcion')             as string)?.trim()
+  const costoRaw        = (formData.get('costo')                   as string)?.trim()
+  const categoria       = (formData.get('categoria')               as string)?.trim()
+  const estatus         = formData.get('estatus') === 'true'
+  const imagenFile      = formData.get('imagen')       as File | null
+  const imagenActual    = (formData.get('imagenActual')            as string)?.trim() || null
+  const publicIdActual  = (formData.get('publicIdActual')          as string)?.trim() || null
 
   if (isNaN(id))                              return { error: 'Producto inválido.' }
   if (!nombre      || nombre.length < 2)      return { error: 'El nombre debe tener al menos 2 caracteres.' }
@@ -203,14 +202,25 @@ export async function actualizarProducto(
   const costo = parseInt(costoRaw)
   if (isNaN(costo) || costo <= 0) return { error: 'El costo debe ser un número mayor a 0.' }
 
-  let imagen = imagenActual
+  let imagen   = imagenActual
+  let publicId = publicIdActual
   if (imagenFile && imagenFile.size > 0) {
-    try { imagen = await guardarImagenProducto(imagenFile) }
-    catch { return { error: 'Error al guardar la imagen.' } }
+    try {
+      const buffer  = Buffer.from(await imagenFile.arrayBuffer())
+      const dataUri = `data:${imagenFile.type};base64,${buffer.toString('base64')}`
+      const result  = await cloudinary.uploader.upload(dataUri, { folder: 'box_gym/productos' })
+      imagen   = result.secure_url
+      publicId = result.public_id
+      if (publicIdActual) {
+        await cloudinary.uploader.destroy(publicIdActual).catch(() => {})
+      }
+    } catch {
+      return { error: 'Error al subir la imagen.' }
+    }
   }
 
   try {
-    await prisma.productos.update({ where: { id }, data: { nombre, descripcion, imagen, costo, categoria, estatus } })
+    await prisma.productos.update({ where: { id }, data: { nombre, descripcion, imagen, publicId, costo, categoria, estatus } })
     return { success: true }
   } catch {
     return { error: 'Error al actualizar el producto. Intenta de nuevo.' }
@@ -241,12 +251,10 @@ export async function crearImagenCarrusel(
     return { error: 'Selecciona una imagen.' }
 
   try {
-    const ext      = imagenFile.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const filename = `${Date.now()}.${ext}`
-    const buffer   = Buffer.from(await imagenFile.arrayBuffer())
-    await writeFile(join(process.cwd(), 'public', 'ImagenCarrusel', filename), buffer)
-    const url = `/ImagenCarrusel/${filename}`
-    await prisma.imagenCarrusel.create({ data: { nombre, url, estatus } })
+    const buffer  = Buffer.from(await imagenFile.arrayBuffer())
+    const dataUri = `data:${imagenFile.type};base64,${buffer.toString('base64')}`
+    const result  = await cloudinary.uploader.upload(dataUri, { folder: 'box_gym/carrusel' })
+    await prisma.imagenCarrusel.create({ data: { nombre, url: result.secure_url, publicId: result.public_id, estatus } })
     return { success: true }
   } catch {
     return { error: 'Error al guardar la imagen. Intenta de nuevo.' }
@@ -256,22 +264,27 @@ export async function crearImagenCarrusel(
 export async function actualizarImagenCarrusel(
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  const id         = parseInt(formData.get('id') as string)
-  const nombre     = (formData.get('nombre') as string)?.trim() || null
-  const estatus    = formData.get('estatus') === 'true'
-  const imagenFile = formData.get('imagen') as File | null
-  const urlActual  = (formData.get('urlActual') as string)?.trim() || null
+  const id             = parseInt(formData.get('id') as string)
+  const nombre         = (formData.get('nombre') as string)?.trim() || null
+  const estatus        = formData.get('estatus') === 'true'
+  const imagenFile     = formData.get('imagen') as File | null
+  const urlActual      = (formData.get('urlActual')     as string)?.trim() || null
+  const publicIdActual = (formData.get('publicIdActual') as string)?.trim() || null
 
   if (isNaN(id)) return { error: 'Imagen inválida.' }
 
-  let url = urlActual
+  let url      = urlActual
+  let publicId = publicIdActual
   if (imagenFile && imagenFile.size > 0) {
     try {
-      const ext      = imagenFile.name.split('.').pop()?.toLowerCase() || 'jpg'
-      const filename = `${Date.now()}.${ext}`
-      const buffer   = Buffer.from(await imagenFile.arrayBuffer())
-      await writeFile(join(process.cwd(), 'public', 'ImagenCarrusel', filename), buffer)
-      url = `/ImagenCarrusel/${filename}`
+      const buffer  = Buffer.from(await imagenFile.arrayBuffer())
+      const dataUri = `data:${imagenFile.type};base64,${buffer.toString('base64')}`
+      const result  = await cloudinary.uploader.upload(dataUri, { folder: 'box_gym/carrusel' })
+      url      = result.secure_url
+      publicId = result.public_id
+      if (publicIdActual) {
+        await cloudinary.uploader.destroy(publicIdActual).catch(() => {})
+      }
     } catch {
       return { error: 'Error al guardar la imagen.' }
     }
@@ -280,7 +293,7 @@ export async function actualizarImagenCarrusel(
   if (!url) return { error: 'La imagen es requerida.' }
 
   try {
-    await prisma.imagenCarrusel.update({ where: { id }, data: { nombre, url, estatus } })
+    await prisma.imagenCarrusel.update({ where: { id }, data: { nombre, url, publicId, estatus } })
     return { success: true }
   } catch {
     return { error: 'Error al actualizar. Intenta de nuevo.' }
