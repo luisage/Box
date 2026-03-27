@@ -175,6 +175,7 @@ export async function crearProducto(
 
   try {
     await prisma.productos.create({ data: { nombre, descripcion, imagen, publicId, costo, categoria, estatus } })
+    revalidatePath('/')
     return { success: true }
   } catch {
     return { error: 'Error al guardar el producto. Intenta de nuevo.' }
@@ -221,6 +222,7 @@ export async function actualizarProducto(
 
   try {
     await prisma.productos.update({ where: { id }, data: { nombre, descripcion, imagen, publicId, costo, categoria, estatus } })
+    revalidatePath('/')
     return { success: true }
   } catch {
     return { error: 'Error al actualizar el producto. Intenta de nuevo.' }
@@ -255,6 +257,7 @@ export async function crearImagenCarrusel(
     const dataUri = `data:${imagenFile.type};base64,${buffer.toString('base64')}`
     const result  = await cloudinary.uploader.upload(dataUri, { folder: 'box_gym/carrusel' })
     await prisma.imagenCarrusel.create({ data: { nombre, url: result.secure_url, publicId: result.public_id, estatus } })
+    revalidatePath('/')
     return { success: true }
   } catch {
     return { error: 'Error al guardar la imagen. Intenta de nuevo.' }
@@ -294,6 +297,7 @@ export async function actualizarImagenCarrusel(
 
   try {
     await prisma.imagenCarrusel.update({ where: { id }, data: { nombre, url, publicId, estatus } })
+    revalidatePath('/')
     return { success: true }
   } catch {
     return { error: 'Error al actualizar. Intenta de nuevo.' }
