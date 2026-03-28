@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getVideos, subirVideo, actualizarVideo, eliminarVideo } from '@/app/actions'
 
 type VideoRow = {
@@ -25,7 +25,6 @@ function VideoDropzone({
   urlActual: string | null
   onChange:  (f: File) => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
 
   function handleFile(f: File | undefined | null) {
@@ -40,7 +39,7 @@ function VideoDropzone({
   const label = file
     ? file.name
     : urlActual
-      ? 'Video actual (haz clic para reemplazar)'
+      ? 'Video actual (toca para reemplazar)'
       : null
 
   return (
@@ -48,8 +47,7 @@ function VideoDropzone({
       onDragOver={(e)  => { e.preventDefault(); setDrag(true) }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]) }}
-      onClick={() => inputRef.current?.click()}
-      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl cursor-pointer transition-colors min-h-[110px] ${
+      className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl cursor-pointer transition-colors min-h-[110px] ${
         drag
           ? 'border-red-500 bg-red-950/20'
           : label
@@ -57,11 +55,11 @@ function VideoDropzone({
             : 'border-gray-700 bg-gray-900 hover:border-red-600'
       }`}
     >
+      {/* Input cubre toda el área — compatible con móvil */}
       <input
-        ref={inputRef}
         type="file"
         accept="video/*"
-        className="sr-only"
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
       {label ? (
@@ -73,7 +71,7 @@ function VideoDropzone({
           {file && (
             <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
           )}
-          <p className="text-xs text-gray-600 pb-2">Haz clic o arrastra para cambiar</p>
+          <p className="text-xs text-gray-600 pb-2">Toca o arrastra para cambiar</p>
         </>
       ) : (
         <>
@@ -81,10 +79,10 @@ function VideoDropzone({
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
           </svg>
           <p className="text-sm text-gray-400 text-center px-4">
-            Arrastra el video aquí o<br />
-            <span className="text-red-400 font-medium">selecciona desde tu dispositivo</span>
+            Toca aquí para seleccionar un video<br />
+            <span className="text-red-400 font-medium">desde tu galería o cámara</span>
           </p>
-          <p className="text-xs text-gray-600 pb-2">MP4, MOV, WEBM · máx. 100 MB</p>
+          <p className="text-xs text-gray-600 pb-2">MP4, MOV, WEBM · máx. 20 MB</p>
         </>
       )}
     </div>
@@ -127,6 +125,12 @@ function VideoModal({ video, onClose, onSuccess }: ModalProps) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!esEdicion && !videoFile) { setError('Selecciona un video.'); return }
+
+    if (videoFile && videoFile.size > 20 * 1024 * 1024) {
+      setError('El video no debe superar 20 MB. Comprime el video antes de subirlo.')
+      return
+    }
+
     setPending(true)
     setProgreso(true)
     setError('')
@@ -143,13 +147,18 @@ function VideoModal({ video, onClose, onSuccess }: ModalProps) {
     fd.set('orden',       fields.orden)
     if (videoFile) fd.set('video', videoFile)
 
-    const result = esEdicion ? await actualizarVideo(fd) : await subirVideo(fd)
-
-    setProgreso(false)
-    if (result.success) {
-      onSuccess(esEdicion ? 'Video actualizado correctamente.' : 'Video subido correctamente.')
-    } else {
-      setError(result.error ?? 'Error desconocido.')
+    try {
+      const result = esEdicion ? await actualizarVideo(fd) : await subirVideo(fd)
+      setProgreso(false)
+      if (result.success) {
+        onSuccess(esEdicion ? 'Video actualizado correctamente.' : 'Video subido correctamente.')
+      } else {
+        setError(result.error ?? 'Error desconocido.')
+        setPending(false)
+      }
+    } catch {
+      setProgreso(false)
+      setError('Error al subir el video. Verifica tu conexión e intenta de nuevo.')
       setPending(false)
     }
   }
