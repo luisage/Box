@@ -37,7 +37,8 @@ export async function subirVideo(
   try {
     const buffer   = Buffer.from(await videoFile.arrayBuffer())
     const b64      = buffer.toString('base64')
-    const dataUri  = `data:${videoFile.type};base64,${b64}`
+    const mime     = videoFile.type || 'video/mp4'
+    const dataUri  = `data:${mime};base64,${b64}`
 
     const result = await cloudinary.uploader.upload(dataUri, {
       resource_type: 'video',
@@ -85,7 +86,8 @@ export async function actualizarVideo(
     try {
       const buffer  = Buffer.from(await videoFile.arrayBuffer())
       const b64     = buffer.toString('base64')
-      const dataUri = `data:${videoFile.type};base64,${b64}`
+      const mime    = videoFile.type || 'video/mp4'
+      const dataUri = `data:${mime};base64,${b64}`
       const result  = await cloudinary.uploader.upload(dataUri, {
         resource_type: 'video',
         folder:        'box_gym/videos',
