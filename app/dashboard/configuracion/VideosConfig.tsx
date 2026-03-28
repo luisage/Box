@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getVideos, subirVideo, actualizarVideo, eliminarVideo } from '@/app/actions'
+import {
+  getVideos,
+  eliminarVideo,
+  getCloudinaryVideoSignature,
+  guardarVideoSubido,
+  actualizarVideo,
+} from '@/app/actions'
 
 type VideoRow = {
   id:          number
@@ -82,7 +88,7 @@ function VideoDropzone({
             Toca aquí para seleccionar un video<br />
             <span className="text-red-400 font-medium">desde tu galería o cámara</span>
           </p>
-          <p className="text-xs text-gray-600 pb-2">MP4, MOV, WEBM · máx. 20 MB</p>
+          <p className="text-xs text-gray-600 pb-2">MP4, MOV, WEBM</p>
         </>
       )}
     </div>
@@ -126,29 +132,59 @@ function VideoModal({ video, onClose, onSuccess }: ModalProps) {
     e.preventDefault()
     if (!esEdicion && !videoFile) { setError('Selecciona un video.'); return }
 
-    if (videoFile && videoFile.size > 20 * 1024 * 1024) {
-      setError('El video no debe superar 20 MB. Comprime el video antes de subirlo.')
-      return
-    }
-
     setPending(true)
     setProgreso(true)
     setError('')
 
-    const fd = new FormData()
-    if (esEdicion) {
-      fd.set('id',             String(video!.id))
-      fd.set('urlActual',      video!.url)
-      fd.set('publicIdActual', video!.publicId)
-    }
-    fd.set('nombre',      fields.nombre)
-    fd.set('descripcion', fields.descripcion)
-    fd.set('estatus',     String(fields.estatus))
-    fd.set('orden',       fields.orden)
-    if (videoFile) fd.set('video', videoFile)
+    const nombre      = fields.nombre.trim()      || null
+    const descripcion = fields.descripcion.trim() || null
+    const estatus     = fields.estatus
+    const orden       = parseInt(fields.orden) || 0
 
     try {
-      const result = esEdicion ? await actualizarVideo(fd) : await subirVideo(fd)
+      let url      = video?.url      ?? ''
+      let publicId = video?.publicId ?? ''
+
+      // Si hay un archivo nuevo, subirlo directo a Cloudinary desde el navegador
+      if (videoFile) {
+        const sig = await getCloudinaryVideoSignature()
+
+        const fd = new FormData()
+        fd.append('file',      videoFile)
+        fd.append('api_key',   sig.apiKey)
+        fd.append('timestamp', String(sig.timestamp))
+        fd.append('signature', sig.signature)
+        fd.append('folder',    sig.folder)
+
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${sig.cloudName}/video/upload`,
+          { method: 'POST', body: fd }
+        )
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err?.error?.message ?? `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        url      = data.secure_url
+        publicId = data.public_id
+      }
+
+      let result
+      if (esEdicion) {
+        result = await actualizarVideo({
+          id:              video!.id,
+          url,
+          publicId,
+          publicIdAnterior: videoFile ? video!.publicId : undefined,
+          nombre,
+          descripcion,
+          estatus,
+          orden,
+        })
+      } else {
+        result = await guardarVideoSubido({ url, publicId, nombre, descripcion, estatus, orden })
+      }
+
       setProgreso(false)
       if (result.success) {
         onSuccess(esEdicion ? 'Video actualizado correctamente.' : 'Video subido correctamente.')
@@ -158,7 +194,7 @@ function VideoModal({ video, onClose, onSuccess }: ModalProps) {
       }
     } catch (e) {
       setProgreso(false)
-      setError(`Error inesperado: ${e instanceof Error ? e.message : String(e)}`)
+      setError(`Error al subir: ${e instanceof Error ? e.message : String(e)}`)
       setPending(false)
     }
   }

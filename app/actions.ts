@@ -20,97 +20,74 @@ export async function getVideosActivos() {
   })
 }
 
-export async function subirVideo(
-  formData: FormData
-): Promise<{ error?: string; success?: boolean }> {
-  const nombre      = (formData.get('nombre')      as string)?.trim() || null
-  const descripcion = (formData.get('descripcion') as string)?.trim() || null
-  const estatus     = formData.get('estatus') === 'true'
-  const orden       = parseInt((formData.get('orden') as string) || '0') || 0
-  const videoFile   = formData.get('video') as File | null
-
-  if (!videoFile || videoFile.size === 0) return { error: 'Selecciona un video.' }
-
-  const maxBytes = 100 * 1024 * 1024 // 100 MB límite
-  if (videoFile.size > maxBytes) return { error: 'El video no debe superar 100 MB.' }
-
-  try {
-    const buffer   = Buffer.from(await videoFile.arrayBuffer())
-    const b64      = buffer.toString('base64')
-    const mime     = videoFile.type || 'video/mp4'
-    const dataUri  = `data:${mime};base64,${b64}`
-
-    const result = await cloudinary.uploader.upload(dataUri, {
-      resource_type: 'video',
-      folder:        'box_gym/videos',
-      chunk_size:    6_000_000,
-    })
-
-    await prisma.videos.create({
-      data: {
-        nombre,
-        descripcion,
-        url:      result.secure_url,
-        publicId: result.public_id,
-        estatus,
-        orden,
-      },
-    })
-    revalidatePath('/')
-    return { success: true }
-  } catch (e) {
-    console.error('[subirVideo]', e)
-    const msg = e instanceof Error ? e.message : String(e)
-    return { error: `Error: ${msg}` }
+// Genera una firma para que el cliente suba directamente a Cloudinary
+export async function getCloudinaryVideoSignature(): Promise<{
+  signature: string
+  timestamp: number
+  cloudName: string
+  apiKey:    string
+  folder:    string
+}> {
+  const timestamp = Math.round(Date.now() / 1000)
+  const folder    = 'box_gym/videos'
+  const signature = cloudinary.utils.api_sign_request(
+    { timestamp, folder },
+    process.env.CLOUDINARY_API_SECRET!
+  )
+  return {
+    signature,
+    timestamp,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
+    apiKey:    process.env.CLOUDINARY_API_KEY!,
+    folder,
   }
 }
 
-export async function actualizarVideo(
-  formData: FormData
-): Promise<{ error?: string; success?: boolean }> {
-  const id          = parseInt(formData.get('id') as string)
-  const nombre      = (formData.get('nombre')      as string)?.trim() || null
-  const descripcion = (formData.get('descripcion') as string)?.trim() || null
-  const estatus     = formData.get('estatus') === 'true'
-  const orden       = parseInt((formData.get('orden') as string) || '0') || 0
-  const videoFile   = formData.get('video') as File | null
-  const urlActual   = (formData.get('urlActual')   as string)?.trim()
-  const publicIdActual = (formData.get('publicIdActual') as string)?.trim()
-
-  if (isNaN(id)) return { error: 'Video inválido.' }
-
-  let url      = urlActual
-  let publicId = publicIdActual
-
-  if (videoFile && videoFile.size > 0) {
-    if (videoFile.size > 100 * 1024 * 1024) return { error: 'El video no debe superar 100 MB.' }
-    try {
-      const buffer  = Buffer.from(await videoFile.arrayBuffer())
-      const b64     = buffer.toString('base64')
-      const mime    = videoFile.type || 'video/mp4'
-      const dataUri = `data:${mime};base64,${b64}`
-      const result  = await cloudinary.uploader.upload(dataUri, {
-        resource_type: 'video',
-        folder:        'box_gym/videos',
-        chunk_size:    6_000_000,
-      })
-      url      = result.secure_url
-      publicId = result.public_id
-      // Eliminar video anterior de Cloudinary
-      if (publicIdActual) {
-        await cloudinary.uploader.destroy(publicIdActual, { resource_type: 'video' }).catch(() => {})
-      }
-    } catch (e) {
-      console.error('[actualizarVideo upload]', e)
-      return { error: 'Error al subir el video.' }
-    }
+// Guarda el video en la BD después de que el cliente lo subió a Cloudinary
+export async function guardarVideoSubido(data: {
+  url:         string
+  publicId:    string
+  nombre:      string | null
+  descripcion: string | null
+  estatus:     boolean
+  orden:       number
+}): Promise<{ error?: string; success?: boolean }> {
+  try {
+    await prisma.videos.create({ data })
+    revalidatePath('/')
+    return { success: true }
+  } catch {
+    return { error: 'Error al guardar el video.' }
   }
+}
 
+// Actualiza metadata del video; si se subió uno nuevo borra el anterior de Cloudinary
+export async function actualizarVideo(data: {
+  id:              number
+  url:             string
+  publicId:        string
+  publicIdAnterior?: string
+  nombre:          string | null
+  descripcion:     string | null
+  estatus:         boolean
+  orden:           number
+}): Promise<{ error?: string; success?: boolean }> {
+  if (isNaN(data.id)) return { error: 'Video inválido.' }
   try {
     await prisma.videos.update({
-      where: { id },
-      data:  { nombre, descripcion, url, publicId, estatus, orden },
+      where: { id: data.id },
+      data:  {
+        url:         data.url,
+        publicId:    data.publicId,
+        nombre:      data.nombre,
+        descripcion: data.descripcion,
+        estatus:     data.estatus,
+        orden:       data.orden,
+      },
     })
+    if (data.publicIdAnterior && data.publicIdAnterior !== data.publicId) {
+      await cloudinary.uploader.destroy(data.publicIdAnterior, { resource_type: 'video' }).catch(() => {})
+    }
     revalidatePath('/')
     return { success: true }
   } catch {
