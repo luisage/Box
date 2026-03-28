@@ -29,7 +29,11 @@ function VideoDropzone({
   const [drag, setDrag] = useState(false)
 
   function handleFile(f: File | undefined | null) {
-    if (!f || !f.type.startsWith('video/')) return
+    if (!f) return
+    const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+    const videoExts = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp', 'm4v']
+    const esVideo = f.type.startsWith('video/') || videoExts.includes(ext)
+    if (!esVideo) return
     onChange(f)
   }
 
