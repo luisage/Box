@@ -55,6 +55,7 @@ export async function subirVideo(
         orden,
       },
     })
+    revalidatePath('/')
     return { success: true }
   } catch (e) {
     console.error('[subirVideo]', e)
@@ -107,6 +108,7 @@ export async function actualizarVideo(
       where: { id },
       data:  { nombre, descripcion, url, publicId, estatus, orden },
     })
+    revalidatePath('/')
     return { success: true }
   } catch {
     return { error: 'Error al actualizar el video.' }
@@ -123,6 +125,7 @@ export async function eliminarVideo(
     if (video.publicId) {
       await cloudinary.uploader.destroy(video.publicId, { resource_type: 'video' }).catch(() => {})
     }
+    revalidatePath('/')
     return { success: true }
   } catch {
     return { error: 'Error al eliminar el video.' }
