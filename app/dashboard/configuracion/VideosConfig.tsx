@@ -156,9 +156,9 @@ function VideoModal({ video, onClose, onSuccess }: ModalProps) {
         setError(result.error ?? 'Error desconocido.')
         setPending(false)
       }
-    } catch {
+    } catch (e) {
       setProgreso(false)
-      setError('Error al subir el video. Verifica tu conexión e intenta de nuevo.')
+      setError(`Error inesperado: ${e instanceof Error ? e.message : String(e)}`)
       setPending(false)
     }
   }

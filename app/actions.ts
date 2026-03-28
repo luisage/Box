@@ -60,7 +60,8 @@ export async function subirVideo(
     return { success: true }
   } catch (e) {
     console.error('[subirVideo]', e)
-    return { error: 'Error al subir el video. Intenta de nuevo.' }
+    const msg = e instanceof Error ? e.message : String(e)
+    return { error: `Error: ${msg}` }
   }
 }
 
