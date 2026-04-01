@@ -2,6 +2,8 @@ import { prisma } from '@/app/lib/prisma'
 import { hoyEnCDMX } from '@/app/lib/timezone'
 import AlumnosClient, { type AlumnoRow } from '@/app/dashboard/alumnos/AlumnosClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AlumnosPage() {
   const hoy = hoyEnCDMX()
 

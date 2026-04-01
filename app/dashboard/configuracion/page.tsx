@@ -7,17 +7,19 @@ import CategoriasProductoConfig from './CategoriasProductoConfig'
 import ProductosConfig          from './ProductosConfig'
 import CarruselConfig           from './CarruselConfig'
 import VideosConfig             from './VideosConfig'
+import ContrasenaConfig         from './ContrasenaConfig'
 
-type SeccionKey = '' | 'novedades' | 'resenas' | 'categorias' | 'productos' | 'carrusel' | 'videos'
+type SeccionKey = '' | 'novedades' | 'resenas' | 'categorias' | 'productos' | 'carrusel' | 'videos' | 'contrasena'
 
 const SECCIONES: { value: SeccionKey; label: string }[] = [
-  { value: '',          label: 'Elige el tema a configurar' },
-  { value: 'novedades', label: 'Novedades' },
+  { value: '',           label: 'Elige el tema a configurar' },
+  { value: 'novedades',  label: 'Novedades' },
   { value: 'resenas',    label: 'Reseñas' },
   { value: 'categorias', label: 'Categorías de producto' },
   { value: 'productos',  label: 'Productos' },
   { value: 'carrusel',   label: 'Imágenes carrusel' },
   { value: 'videos',     label: 'Videos' },
+  { value: 'contrasena', label: 'Modificar contraseña' },
 ]
 
 export default function ConfiguracionPage() {
@@ -71,9 +73,10 @@ export default function ConfiguracionPage() {
       {seccion === 'resenas'    && <ResenasConfig />}
       {seccion === 'categorias' && <CategoriasProductoConfig />}
 
-      {seccion === 'productos' && <ProductosConfig />}
-      {seccion === 'carrusel'  && <CarruselConfig />}
-      {seccion === 'videos'    && <VideosConfig />}
+      {seccion === 'productos'  && <ProductosConfig />}
+      {seccion === 'carrusel'   && <CarruselConfig />}
+      {seccion === 'videos'     && <VideosConfig />}
+      {seccion === 'contrasena' && <ContrasenaConfig />}
     </div>
   )
 }

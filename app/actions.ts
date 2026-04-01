@@ -467,6 +467,33 @@ export async function logoutAction() {
   cookieStore.delete('session')
 }
 
+export async function cambiarContrasena(
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  const actual  = formData.get('actual')  as string
+  const nueva   = formData.get('nueva')   as string
+  const confirma = formData.get('confirma') as string
+
+  if (!actual || !nueva || !confirma) return { error: 'Completa todos los campos.' }
+  if (nueva.length <= 3) return { error: 'La nueva contraseña debe tener más de 3 caracteres.' }
+  if (nueva !== confirma) return { error: 'La nueva contraseña y la confirmación no coinciden.' }
+
+  const cookieStore = await cookies()
+  const userId = parseInt(cookieStore.get('session')?.value ?? '')
+  if (isNaN(userId)) return { error: 'Sesión no válida.' }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) return { error: 'Usuario no encontrado.' }
+
+  const correcta = await bcrypt.compare(actual, user.password)
+  if (!correcta) return { error: 'La contraseña actual es incorrecta.' }
+
+  const hash = await bcrypt.hash(nueva, 10)
+  await prisma.user.update({ where: { id: userId }, data: { password: hash } })
+
+  return { success: true }
+}
+
 // ── Asistencias ───────────────────────────────────────────────────────────────
 
 export async function registrarAsistencia(
